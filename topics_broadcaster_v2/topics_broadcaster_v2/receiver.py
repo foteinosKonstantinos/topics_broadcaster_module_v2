@@ -4,15 +4,15 @@ from std_msgs.msg import Float32
 from sensor_msgs.msg import NavSatFix, Image, CameraInfo
 from rclpy.executors import ExternalShutdownException
 import socket
-from . import Logger, blue_fore, blue_back, CONFIGURATION, red_fore, green_fore
+from . import Logger, blue_fore, blue_back, CONFIGURATION, red_fore, green_fore, red_back
 import pickle
 import time
 from message_filters import Subscriber, ApproximateTimeSynchronizer
 from rclpy.qos import qos_profile_sensor_data
 import math
 
-def send_TCP(chunk:bytes,                   #
-            logger:Logger|None=None,        #
+def send_TCP(msg_bytes:bytes,               #
+            logger:Logger,                  #
             prefix:str="",                  #
             config:dict=CONFIGURATION,      #
             ) -> bytes:
@@ -26,24 +26,53 @@ def send_TCP(chunk:bytes,                   #
         client.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, config["chunk_size"]+config["increment"])
         client.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, config["server_response_size"]+config["increment"])
         client.connect((address, port))
-        chunk_size = client.send(chunk)
-        if chunk_size != len(chunk):
-            if logger is not None:
-                logger.error(f"{prefix} {red_fore('Data truncated by client (client error)')}")
-            return config["error"]
-            
-        response = client.recv(config["server_response_size"])
+
+        chunk_size = config["chunk_size"]
+        total_chunks = math.ceil(len(msg_bytes) / chunk_size)
+
+        logger.info(f"{prefix} [Total size: {len(msg_bytes)}B total size] [End indicator size: {len(config['end'])}B] [Chunks: {blue_fore(total_chunks)} x {chunk_size}B] [{blue_fore(config['server_IP'])}:{blue_fore(config['server_port'])}]")
+
+        total_send = 0
+
+        for i in range(total_chunks):
+
+            chunk = msg_bytes[i*chunk_size:(i+1)*chunk_size]
+            send_size = client.send(chunk)
+            total_send += send_size
+
+            response = client.recv(config["server_response_size"])
+
+        if total_send != len(msg_bytes):
+            logger.error(f"{prefix} {red_fore('Data truncated by client')}")
+
+        if response == config["valid"]:
+            logger.info(f"{prefix} {green_fore('Success')}")
+        elif response == config["invalid"]:
+            logger.error(f"{prefix} {red_fore('Failure')}")
+        else:
+            logger.warn(f"{prefix} {red_fore('Uknown reponse code')} {response}")
+
         return response
 
     except ConnectionRefusedError:
-        if logger is not None:
-            logger.error(f"{prefix} {red_fore('Connection refused (server error)')}")
+        logger.error(f"{prefix} {red_fore('Connection refused (server error)')}")
         return config["error"]
 
     except ConnectionResetError:
-        if logger is not None:
-            logger.error(f"{prefix} {red_fore('Connection reset (server error)')}")
+        logger.error(f"{prefix} {red_fore('Connection reset (server error)')}")
         return config["error"]
+
+    except BrokenPipeError:
+        logger.error(f"{prefix} {red_fore('Connection closed by server (server error)')}")
+        return config["error"]
+
+    except BaseException as e:
+        logger.error(f"{prefix} {red_back(str(e))}")
+        return config["error"]
+
+    finally:
+        logger.info(f"{prefix} Connection closed")
+        client.close()
 
 
 class Receiver(Node, Logger):
@@ -81,9 +110,6 @@ class Receiver(Node, Logger):
                 return False
         return True
 
-    def __update(self):
-        self.__previous = time.time()
-
     def info(self, msg):
         self.get_logger().info(msg)
     
@@ -105,27 +131,11 @@ class Receiver(Node, Logger):
             "fix": fix,
             "heading": heading
         }) + self.__config["end"]
-        chunk_size = self.__config["chunk_size"]
-        total_chunks = math.ceil(len(msg_bytes) / chunk_size)
+        self.__previous = time.time()
         prefix = f"\033[0;0m[ID: {blue_fore(self.__msg_id)}]"
-        self.info(f"{prefix} [Total size: {len(msg_bytes)}B total size] [End indicator size: {len(self.__config['end'])}B] [Chunks: {blue_fore(total_chunks)} x {chunk_size}B] [{blue_fore(self.__config['server_IP'])}:{blue_fore(self.__config['server_port'])}]")
-        self.__update()
-        for i in range(total_chunks):
-            chunk = msg_bytes[i*chunk_size:(i+1)*chunk_size]
-            while True:
-                response = send_TCP(chunk=chunk,logger=self,prefix=prefix,config=self.__config)        
-                if response == self.__config["error"]:
-                    self.warn(f"{prefix} Error during transmitting chunk {i+1}/{total_chunks}, retry ...")
-                    time.sleep(self.__config["delay"])
-                else:
-                    break # ok, invalid, valid
-        if response == self.__config["valid"]:
-            self.info(f"{prefix} {green_fore('Success')}")
-        elif response == self.__config["invalid"]:
-            self.error(f"{prefix} {red_fore('Failure')}")
-        else:
-            self.warn(f"{prefix} {red_fore('Uknown reponse code')} {response}")
-
+        response = send_TCP(msg_bytes=msg_bytes, logger=self, prefix=prefix, config=self.__config)
+        if response != self.__config["valid"]:
+            self.__previous = None
 
 def main():
     try:

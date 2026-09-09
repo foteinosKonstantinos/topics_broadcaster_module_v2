@@ -12,7 +12,7 @@ class Server_Chunked_TCP:
 
     def __init__(self,
                 callback:Callable[[dict], int],     # Function to apply to the message(s)
-                logger:Logger|None=None,
+                logger:Logger,
                 max_connections:int=1,              # Maxinum waiting connections
                 config:dict=CONFIGURATION,
                 prefix:str="\033[0;0m[TCP SERVER]"
@@ -24,8 +24,6 @@ class Server_Chunked_TCP:
         self.__prefix = prefix
         self.__config = config
 
-        self.__message = None
-
     def start(self) -> None:
 
         address, port = self.__config["server_IP"], self.__config["server_port"]
@@ -36,36 +34,45 @@ class Server_Chunked_TCP:
         server.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, self.__config["chunk_size"]+self.__config["increment"])
         server.bind((address, port))
         server.listen(self.__max_connections)
-        if self.__logger is not None:
-            self.__logger.info(f"{self.__prefix} {green_fore('\u25CF Activated')} @ {blue_fore(address)}:{blue_fore(port)} [chunk size: {self.__config['chunk_size']}B] [max conn.: {self.__max_connections}]")
+        self.__logger.info(f"{self.__prefix} {green_fore('\u25CF Activated')} @ {blue_fore(address)}:{blue_fore(port)} [chunk size: {self.__config['chunk_size']}B] [max conn.: {self.__max_connections}]")
 
         while True:
 
-            connection, client_address = server.accept()
-            chunk = connection.recv(self.__config["chunk_size"])
+            try:
 
-            if self.__message is None:
-                self.__message = chunk
-            else:
-                self.__message = self.__message + chunk
+                connection, client_address = server.accept()
+                message = b""
 
-            if chunk.endswith(self.__config["end"]): # last chunk
-                try:
-                    self.__message = self.__message[:-len(self.__config["end"])] # Remove indicator
-                    data = pickle.loads(self.__message)
-                    msg_id = self.__callback(data)
-                    if self.__logger is not None:
-                        self.__logger.info(f"{self.__prefix} {green_fore('Success')}: Msg. {blue_fore(msg_id)} parsed (last conn.: {blue_fore(client_address[0])}:{blue_fore(client_address[1])}).")
-                    _ = connection.send(self.__config["valid"])
-                except BaseException as e:
-                    if self.__logger is not None:
-                        self.__logger.error(f"{self.__prefix} Error: '{red_back(e)}' (last conn.: {blue_fore(client_address[0])}:{blue_fore(client_address[1])}).")
-                    _ = connection.send(self.__config["invalid"])
-                self.__message = None
-            else:
-                _ = connection.send(self.__config["ok"])
+                self.__logger.info(f"{self.__prefix} New connection: {blue_fore(client_address[0])}:{blue_fore(client_address[1])}")
 
-            connection.close()
+                while True:
+
+                    chunk = connection.recv(self.__config["chunk_size"])
+                    message = message + chunk
+
+                    print(f"{self.__prefix} Received: {len(message)}B", end="\r")
+
+                    if chunk.endswith(self.__config["end"]): # last chunk
+                        print()
+                        try:
+                            message = message[:-len(self.__config["end"])] # Remove indicator
+                            data = pickle.loads(message)
+                            msg_id = self.__callback(data)
+                            self.__logger.info(f"{self.__prefix} {green_fore('Success')}: Msg. {blue_fore(msg_id)} parsed")
+                            _ = connection.send(self.__config["valid"])
+                        except BaseException as e:
+                            self.__logger.error(f"{self.__prefix} Error: '{red_back(e)}'")
+                            _ = connection.send(self.__config["invalid"])
+                        message = None
+                        break
+                    else:
+                        _ = connection.send(self.__config["ok"])
+
+            except BaseException as e:
+                self.__logger.error(f"{self.__prefix} Error: '{red_back(e)}'")
+            finally:
+                self.__logger.info(f"{self.__prefix} Connection closed")
+                connection.close()
 
 
 class Transmitter(Node, Logger):

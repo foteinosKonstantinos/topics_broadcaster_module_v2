@@ -20,11 +20,11 @@ blue_fore = lambda x:f"\033[1;94m{x}\033[0;0m"
 
 CONFIGURATION = {
 
-    "fps": 1,
+    "fps": 2,
 
     "server_IP": "127.0.0.1",
     "server_port": 49152,
-    "chunk_size": 512,
+    "chunk_size": 4096,
     # "prelude": b"[===PRELUDE===]",
     "end": b"[===END===]",
     "server_response_size": 16,
@@ -33,7 +33,7 @@ CONFIGURATION = {
     "valid": b"VALID",
     "error": b"ERROR",
     "invalid": b"INVALID",
-    "delay": 0.5,
+    "delay": 0,
     "slop": 1e-1,
 
     "heading_topic_ugv": "/b2/nicla/magnetometer/heading",
