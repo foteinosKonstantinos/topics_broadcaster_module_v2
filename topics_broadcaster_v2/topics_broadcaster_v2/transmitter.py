@@ -37,7 +37,7 @@ class Server_Chunked_TCP:
         server.bind((address, port))
         server.listen(self.__max_connections)
         if self.__logger is not None:
-            self.__logger.info(f"{self.__prefix} {green_fore('\u25CF Activated')} @ {blue_fore(address)}:{blue_fore(port)} [in. buffer: {self.__config['chunk_size']}] [max conn.: {self.__max_connections}]")
+            self.__logger.info(f"{self.__prefix} {green_fore('\u25CF Activated')} @ {blue_fore(address)}:{blue_fore(port)} [chunk size: {self.__config['chunk_size']}B] [max conn.: {self.__max_connections}]")
 
         while True:
 
@@ -49,18 +49,18 @@ class Server_Chunked_TCP:
             else:
                 self.__message = self.__message + chunk
 
-            if chunk.endswith(self.__config["end"]):
+            if chunk.endswith(self.__config["end"]): # last chunk
                 try:
-                    self.__message = self.__message[len(self.__config["end"]):] # Remove indicator
+                    self.__message = self.__message[:-len(self.__config["end"])] # Remove indicator
                     data = pickle.loads(self.__message)
                     msg_id = self.__callback(data)
                     if self.__logger is not None:
                         self.__logger.info(f"{self.__prefix} {green_fore('Success')}: Msg. {blue_fore(msg_id)} parsed (last conn.: {blue_fore(client_address[0])}:{blue_fore(client_address[1])}).")
                     _ = connection.send(self.__config["valid"])
-                except pickle.UnpicklingError as e:
+                except BaseException as e:
                     if self.__logger is not None:
                         self.__logger.error(f"{self.__prefix} Error: '{red_back(e)}' (last conn.: {blue_fore(client_address[0])}:{blue_fore(client_address[1])}).")
-                    _ = connection.send(self.__config["error"])
+                    _ = connection.send(self.__config["invalid"])
                 self.__message = None
             else:
                 _ = connection.send(self.__config["ok"])

@@ -24,7 +24,7 @@ CONFIGURATION = {
 
     "server_IP": "127.0.0.1",
     "server_port": 49152,
-    "chunk_size": 256,
+    "chunk_size": 512,
     # "prelude": b"[===PRELUDE===]",
     "end": b"[===END===]",
     "server_response_size": 16,
@@ -32,7 +32,8 @@ CONFIGURATION = {
     "ok": b"OK",
     "valid": b"VALID",
     "error": b"ERROR",
-    "delay": 0.0001,
+    "invalid": b"INVALID",
+    "delay": 0.5,
     "slop": 1e-1,
 
     "heading_topic_ugv": "/b2/nicla/magnetometer/heading",

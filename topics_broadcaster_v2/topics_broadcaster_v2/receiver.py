@@ -113,16 +113,18 @@ class Receiver(Node, Logger):
         for i in range(total_chunks):
             chunk = msg_bytes[i*chunk_size:(i+1)*chunk_size]
             while True:
-                time.sleep(self.__config["delay"])
                 response = send_TCP(chunk=chunk,logger=self,prefix=prefix,config=self.__config)        
                 if response == self.__config["error"]:
                     self.warn(f"{prefix} Error during transmitting chunk {i+1}/{total_chunks}, retry ...")
+                    time.sleep(self.__config["delay"])
                 else:
-                    break
+                    break # ok, invalid, valid
         if response == self.__config["valid"]:
             self.info(f"{prefix} {green_fore('Success')}")
+        elif response == self.__config["invalid"]:
+            self.error(f"{prefix} {red_fore('Failure')}")
         else:
-            self.error(f"{prefix} {green_fore('Failure')}")
+            self.warn(f"{prefix} {red_fore('Uknown reponse code')} {response}")
 
 
 def main():
