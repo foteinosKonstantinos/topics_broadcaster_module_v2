@@ -4,7 +4,7 @@ from std_msgs.msg import Float32
 from sensor_msgs.msg import NavSatFix, Image, CameraInfo
 from rclpy.executors import ExternalShutdownException
 import socket
-from . import Logger, CONFIGURATION, green_fore, blue_back, blue_fore, red_back
+from . import Logger, CONFIGURATION, green_fore, blue_back, blue_fore, red_back, decompress_image
 import pickle
 from typing import Callable
 
@@ -87,17 +87,17 @@ class Transmitter(Node, Logger):
             qos_profile = 10,
         )
 
-        self.__fix_publisher=self.create_publisher(
-            msg_type = NavSatFix,
-            topic = self.__config["fix_topic_gs"],
-            qos_profile = 10,
-        )
+        # self.__fix_publisher=self.create_publisher(
+        #     msg_type = NavSatFix,
+        #     topic = self.__config["fix_topic_gs"],
+        #     qos_profile = 10,
+        # )
 
-        self.__intrinsics_publisher=self.create_publisher(
-            msg_type = CameraInfo,
-            topic = self.__config["intrinsics_topic_gs"],
-            qos_profile = 10,
-        )
+        # self.__intrinsics_publisher=self.create_publisher(
+        #     msg_type = CameraInfo,
+        #     topic = self.__config["intrinsics_topic_gs"],
+        #     qos_profile = 10,
+        # )
 
         self.__rgb_publisher=self.create_publisher(
             msg_type = Image,
@@ -125,12 +125,23 @@ class Transmitter(Node, Logger):
     def error(self, msg):
         self.get_logger().error(msg)
 
+    def __compose_image_message(self, image_data:dict):
+        msg = Image()
+        msg.header = image_data["header"]
+        msg.height = image_data["height"]
+        msg.width = image_data["width"]
+        msg.encoding = image_data["encoding"]
+        msg.is_bigendian = image_data["is_bigendian"]
+        msg.step = image_data["step"]
+        msg.data = decompress_image(image_data["data"]).tobytes()
+        return msg
+
     def __callback(self, data:dict) -> int:
         self.__heading_publisher.publish(data["heading"])
-        self.__rgb_publisher.publish(data["color"])
+        self.__rgb_publisher.publish(self.__compose_image_message(data["color"]))
         self.__depth_publisher.publish(data["depth"])
-        self.__fix_publisher.publish(data["fix"])
-        self.__intrinsics_publisher.publish(data["intrinsics"])
+        # self.__fix_publisher.publish(data["fix"])
+        # self.__intrinsics_publisher.publish(data["intrinsics"])
         return data["id"]
 
 def main():

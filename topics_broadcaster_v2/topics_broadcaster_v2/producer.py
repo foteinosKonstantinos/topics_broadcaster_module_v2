@@ -24,17 +24,17 @@ class Producer(Node):
             qos_profile = 10
         )
 
-        self.__intrinsics_publisher=self.create_publisher(
-            msg_type = CameraInfo,
-            topic = CONFIGURATION["intrinsics_topic_ugv"],
-            qos_profile = 10
-        )
+        # self.__intrinsics_publisher=self.create_publisher(
+        #     msg_type = CameraInfo,
+        #     topic = CONFIGURATION["intrinsics_topic_ugv"],
+        #     qos_profile = 10
+        # )
 
-        self.__gps_publisher=self.create_publisher(
-            msg_type = NavSatFix,
-            topic = CONFIGURATION["fix_topic_ugv"],
-            qos_profile = 10
-        )
+        # self.__gps_publisher=self.create_publisher(
+        #     msg_type = NavSatFix,
+        #     topic = CONFIGURATION["fix_topic_ugv"],
+        #     qos_profile = 10
+        # )
 
         self.__heading_publisher = self.create_publisher(
             msg_type = Float32,
@@ -55,6 +55,7 @@ class Producer(Node):
 
         color = np.asarray(PILImage.open(self.__color).convert("RGB"))
         depth = np.asarray(PILImage.open(self.__depth),dtype=np.uint16)
+
         msg = SensorImage()
         msg.header.stamp = stamp
         msg.header.frame_id = "camera_depth_frame"
@@ -77,18 +78,18 @@ class Producer(Node):
         msg.data = depth.tobytes()
         self.__depth_publisher.publish(msg)
 
-        msg = CameraInfo()
-        msg.header.stamp = stamp
-        msg.header.frame_id = "camera_depth_frame"
-        msg.height = color.shape[0]
-        msg.width = color.shape[1]
-        msg.k = [606.0, 0.0, 423.0, 0.0, 605.0, 231.0, 0.0, 0.0, 1.0] # FR-GESTURE camera intrinsics
-        self.__intrinsics_publisher.publish(msg)
+        # msg = CameraInfo()
+        # msg.header.stamp = stamp
+        # msg.header.frame_id = "camera_depth_frame"
+        # msg.height = color.shape[0]
+        # msg.width = color.shape[1]
+        # msg.k = [606.0, 0.0, 423.0, 0.0, 605.0, 231.0, 0.0, 0.0, 1.0] # FR-GESTURE camera intrinsics
+        # self.__intrinsics_publisher.publish(msg)
 
-        msg = NavSatFix()
-        msg.header.stamp = stamp
-        (msg.longitude, msg.latitude) = (0.0,0.0)
-        self.__gps_publisher.publish(msg)
+        # msg = NavSatFix()
+        # msg.header.stamp = stamp
+        # (msg.longitude, msg.latitude) = (0.0,0.0)
+        # self.__gps_publisher.publish(msg)
 
         msg = Float32()
         msg.data = 0.0 # degrees, magnetic north, clockwise (!)

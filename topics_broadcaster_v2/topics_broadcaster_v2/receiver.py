@@ -4,12 +4,14 @@ from std_msgs.msg import Float32
 from sensor_msgs.msg import NavSatFix, Image, CameraInfo
 from rclpy.executors import ExternalShutdownException
 import socket
-from . import Logger, blue_fore, blue_back, CONFIGURATION, red_fore, green_fore, red_back
+from . import Logger, blue_fore, blue_back, CONFIGURATION, red_fore, green_fore, red_back, compress_image
 import pickle
 import time
 from message_filters import Subscriber, ApproximateTimeSynchronizer
 from rclpy.qos import qos_profile_sensor_data
 import math
+import numpy as np
+import cv2
 
 def send_TCP(msg_bytes:bytes,               #
             logger:Logger,                  #
@@ -85,8 +87,8 @@ class Receiver(Node, Logger):
             fs=[
                 Subscriber(node=self, msg_type=Image, topic=self.__config["rgb_topic_ugv"]), 
                 Subscriber(node=self, msg_type=Image, topic=self.__config["depth_topic_ugv"]), 
-                Subscriber(node=self, msg_type=CameraInfo, topic=self.__config["intrinsics_topic_ugv"]),
-                Subscriber(node=self, msg_type=NavSatFix, topic=self.__config["fix_topic_ugv"], qos_profile=qos_profile_sensor_data),
+                # Subscriber(node=self, msg_type=CameraInfo, topic=self.__config["intrinsics_topic_ugv"]),
+                # Subscriber(node=self, msg_type=NavSatFix, topic=self.__config["fix_topic_ugv"], qos_profile=qos_profile_sensor_data),
                 Subscriber(node=self, msg_type=Float32, topic=self.__config["heading_topic_ugv"])
             ],
             queue_size=10,
@@ -100,6 +102,8 @@ class Receiver(Node, Logger):
 
         self.__previous = None
         self.__msg_id = 0
+
+        self.declare_parameter("rgb_compression_quality", self.__config["rgb_quality"])
 
     def __fps_filter(self):
         fps = self.__config["fps"]
@@ -119,17 +123,46 @@ class Receiver(Node, Logger):
     def error(self, msg):
         self.get_logger().error(msg)
 
-    def __callback(self, color:Image, depth:Image, intrinsics:CameraInfo, fix:NavSatFix, heading:Float32):
+    # Depends on the image encoding
+    def __array_from_image(self, img:Image):
+
+        # RealSense
+        # yuyv = np.frombuffer(img.data, dtype=np.uint8)
+        # yuyv = yuyv.reshape((img.height, img.width, 2))
+        # # bgr = cv2.cvtColor(yuyv, cv2.COLOR_YUV2BGR_YUY2)
+        # # color_array = bgr.reshape((color_image.height, color_image.width, 3)) # BGR
+        # rgb = cv2.cvtColor(yuyv, cv2.COLOR_YUV2RGB_YUY2)
+        # color_array = rgb.reshape((img.height, img.width, 3)) # RGB
+
+        # Dummy test
+        color_array = np.asarray(img.data, dtype=np.uint8).reshape((img.height, img.width, 3)) # H x W x 3
+        color_array = cv2.cvtColor(color_array, cv2.COLOR_BGR2RGB)
+
+        return color_array
+
+    def __decompose_image_message(self, img:Image) -> dict:
+        return {
+            "header": img.header,
+            "height": img.height,
+            "width": img.width,
+            "encoding": img.encoding,
+            "is_bigendian": img.is_bigendian,
+            "step": img.step,
+            "data": compress_image(self.__array_from_image(img), self.get_parameter("rgb_compression_quality").get_parameter_value().integer_value)
+        }
+
+    def __callback(self, color:Image, depth:Image, #intrinsics:CameraInfo, fix:NavSatFix, 
+                   heading:Float32):
         if not self.__fps_filter():
             return
         self.__msg_id += 1
         msg_bytes = pickle.dumps({
             "id": self.__msg_id,
-            "color": color,
+            "color": self.__decompose_image_message(color),
             "depth": depth,
-            "intrinsics": intrinsics,
-            "fix": fix,
-            "heading": heading
+            "heading": heading,
+            # "intrinsics": intrinsics,
+            # "fix": fix,
         }) + self.__config["end"]
         self.__previous = time.time()
         prefix = f"\033[0;0m[ID: {blue_fore(self.__msg_id)}]"
