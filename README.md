@@ -25,5 +25,7 @@ Run producer (dummy data generator):
 To change the compression ratio:
 
 ```bash
-ros2 param set /receiver_client rgb_compression_quality <quality in percentage>
+ros2 param list
+ros2 param set /receiver_client rgb_compression_quality <quality in 0-100>
+ros2 param set /receiver_client depth_compression_quality <quality in 0-100>
 ```

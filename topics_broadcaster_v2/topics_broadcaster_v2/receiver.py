@@ -104,6 +104,7 @@ class Receiver(Node, Logger):
         self.__msg_id = 0
 
         self.declare_parameter("rgb_compression_quality", self.__config["rgb_quality"])
+        self.declare_parameter("depth_compression_quality", self.__config["depth_quality"])
 
     def __fps_filter(self):
         fps = self.__config["fps"]
@@ -136,19 +137,42 @@ class Receiver(Node, Logger):
 
         # Dummy test
         color_array = np.asarray(img.data, dtype=np.uint8).reshape((img.height, img.width, 3)) # H x W x 3
-        color_array = cv2.cvtColor(color_array, cv2.COLOR_BGR2RGB)
+        color_array = cv2.cvtColor(color_array, cv2.COLOR_BGR2RGB) # RGB
 
         return color_array
 
     def __decompose_image_message(self, img:Image) -> dict:
+        self.warn("YUV2 was converted to RGB8, message attributes may not be accurate")
         return {
             "header": img.header,
             "height": img.height,
             "width": img.width,
-            "encoding": img.encoding,
+            # "encoding": img.encoding,
+            "encoding": "rgb8",
             "is_bigendian": img.is_bigendian,
-            "step": img.step,
+            # "step": img.step,
+            "step": 3 * img.width,
             "data": compress_image(self.__array_from_image(img), self.get_parameter("rgb_compression_quality").get_parameter_value().integer_value)
+        }
+
+    def __decompose_depth_message(self, depth:Image) -> dict:
+        # Decode depth
+        depth_array = np.frombuffer(depth.data, dtype=np.uint16).reshape((depth.height, depth.width)) # mm
+        # Normalize depth
+        max_depth = depth_array.max()
+        depth_normalized = depth_array / max_depth * 255
+        depth_discretized = depth_normalized.round() # error 300 mm (!?), grayscaled
+        # Compress
+        depth_comp = compress_image(depth_discretized, self.get_parameter("depth_compression_quality").get_parameter_value().integer_value)
+        return {
+            "header": depth.header,
+            "height": depth.height,
+            "width": depth.width,
+            "encoding": depth.encoding, # 16UC1
+            "is_bigendian": depth.is_bigendian,
+            "step": depth.step,
+            "data": depth_comp,
+            "max_depth": max_depth,
         }
 
     def __callback(self, color:Image, depth:Image, #intrinsics:CameraInfo, fix:NavSatFix, 
@@ -159,7 +183,7 @@ class Receiver(Node, Logger):
         msg_bytes = pickle.dumps({
             "id": self.__msg_id,
             "color": self.__decompose_image_message(color),
-            "depth": depth,
+            "depth": self.__decompose_depth_message(depth),
             "heading": heading,
             # "intrinsics": intrinsics,
             # "fix": fix,

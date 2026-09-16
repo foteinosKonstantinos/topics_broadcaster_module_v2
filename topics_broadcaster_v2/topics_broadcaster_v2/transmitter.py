@@ -4,9 +4,10 @@ from std_msgs.msg import Float32
 from sensor_msgs.msg import NavSatFix, Image, CameraInfo
 from rclpy.executors import ExternalShutdownException
 import socket
-from . import Logger, CONFIGURATION, green_fore, blue_back, blue_fore, red_back, decompress_image
+from . import Logger, CONFIGURATION, green_fore, blue_back, blue_fore, red_back, decompress_color, decompress_gray
 import pickle
 from typing import Callable
+import numpy as np
 
 class Server_Chunked_TCP:
 
@@ -133,13 +134,29 @@ class Transmitter(Node, Logger):
         msg.encoding = image_data["encoding"]
         msg.is_bigendian = image_data["is_bigendian"]
         msg.step = image_data["step"]
-        msg.data = decompress_image(image_data["data"]).tobytes()
+        msg.data = decompress_color(image_data["data"]).tobytes()
+        return msg
+
+    def __compose_depth_message(self, depth_data:dict):
+        # Decompress
+        depth_discretized = decompress_gray(depth_data["data"])
+        # Change range to [0 - max_depth]
+        depth_unnormalized = (depth_discretized / 255 * depth_data["max_depth"]).round().astype(np.uint16)
+        # Create message
+        msg = Image()
+        msg.header = depth_data["header"]
+        msg.height = depth_data["height"]
+        msg.width = depth_data["width"]
+        msg.encoding = depth_data["encoding"]
+        msg.is_bigendian = depth_data["is_bigendian"]
+        msg.step = depth_data["step"]
+        msg.data = depth_unnormalized.tobytes()
         return msg
 
     def __callback(self, data:dict) -> int:
         self.__heading_publisher.publish(data["heading"])
         self.__rgb_publisher.publish(self.__compose_image_message(data["color"]))
-        self.__depth_publisher.publish(data["depth"])
+        self.__depth_publisher.publish(self.__compose_depth_message(data["depth"]))
         # self.__fix_publisher.publish(data["fix"])
         # self.__intrinsics_publisher.publish(data["intrinsics"])
         return data["id"]

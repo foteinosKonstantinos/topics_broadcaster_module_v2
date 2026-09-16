@@ -23,8 +23,11 @@ def compress_image(img, quality):
         raise ValueError("Compression failed")
     return res[1]
 
-def decompress_image(data):
+def decompress_color(data):
     return cv2.imdecode(data, cv2.IMREAD_COLOR)
+
+def decompress_gray(data):
+    return cv2.imdecode(data, cv2.IMREAD_GRAYSCALE)
 
 
 # Available ports: 49152-65535
@@ -55,10 +58,11 @@ CONFIGURATION = {
 
     "rgb_topic_ugv": "/b2/camera_front_435i/realsense_front_435i/color/image_raw",
     "rgb_topic_gs": "/b2/camera_front_435i/realsense_front_435i/color/image_raw_broadcasted",
-    "rgb_quality": 50, # percentage
+    "rgb_quality": 80, # percentage
 
-    "depth_topic_ugv": "/b2/camera_front_435i/realsense_front_435i/depth/image_rect_raw",
-    "depth_topic_gs": "/b2/camera_front_435i/realsense_front_435i/depth/image_rect_raw_broadcasted",
+    "depth_topic_ugv": "/b2/camera_front_435i/realsense_front_435i/aligned_depth_to_color/image_raw",
+    "depth_topic_gs": "/b2/camera_front_435i/realsense_front_435i/aligned_depth_to_color/image_raw_broadcasted",
+    "depth_quality": 100, # percentage
 
     # "intrinsics_topic_ugv": "/b2/camera_front_435i/realsense_front_435i/color/camera_info",
     # "intrinsics_topic_gs": "/b2/camera_front_435i/realsense_front_435i/color/camera_info_broadcasted",
