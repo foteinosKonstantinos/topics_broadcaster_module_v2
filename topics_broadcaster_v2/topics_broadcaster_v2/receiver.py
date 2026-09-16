@@ -41,18 +41,25 @@ def send_TCP(msg_bytes:bytes,               #
             chunk = msg_bytes[i*chunk_size:(i+1)*chunk_size]
             send_size = client.send(chunk)
             total_send += send_size
+            response = client.recv(config["server_response_size"])
+            print(f"{prefix} Sent: [{i+1}/{total_chunks}]", end="\r")
 
+        print()
+
+        while True: # avoid closing connection ("[Errno 104] Connection reset by peer")
+            if response == config["valid"]:
+                logger.info(f"{prefix} {green_fore('Success')}")
+                break
+            elif response == config["invalid"]:
+                logger.error(f"{prefix} {red_fore('Failure')}")
+                break
+            elif response == b"":
+                logger.warn(f"{prefix} Final response (valid or invalid) not received")
+                break
             response = client.recv(config["server_response_size"])
 
         if total_send != len(msg_bytes):
             logger.error(f"{prefix} {red_fore('Data truncated by client')}")
-
-        if response == config["valid"]:
-            logger.info(f"{prefix} {green_fore('Success')}")
-        elif response == config["invalid"]:
-            logger.error(f"{prefix} {red_fore('Failure')}")
-        else:
-            logger.warn(f"{prefix} {red_fore('Uknown reponse code')} {response}")
 
         return response
 
