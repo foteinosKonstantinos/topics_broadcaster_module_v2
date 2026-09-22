@@ -98,7 +98,7 @@ class Receiver(Node, Logger):
                 # Subscriber(node=self, msg_type=NavSatFix, topic=self.__config["fix_topic_ugv"], qos_profile=qos_profile_sensor_data),
                 Subscriber(node=self, msg_type=Float32, topic=self.__config["heading_topic_ugv"])
             ],
-            queue_size=10,
+            queue_size=1,
             slop=self.__config["slop"],
             allow_headerless=True
         )
