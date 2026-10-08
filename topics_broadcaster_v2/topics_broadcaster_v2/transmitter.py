@@ -112,6 +112,12 @@ class Transmitter(Node, Logger):
             qos_profile = 10,
         )
 
+        self.__flir_publisher=self.create_publisher(
+            msg_type = Image,
+            topic = self.__config["flir_topic_gs"],
+            qos_profile = 10
+        )
+
         self.info(blue_back("RUNNING TRANSMITTER (SERVER) ON GROUND STATION"))
 
         self.__server = Server_Chunked_TCP(callback=self.__callback,logger=self,config=self.__config)
@@ -157,6 +163,7 @@ class Transmitter(Node, Logger):
         self.__heading_publisher.publish(data["heading"])
         self.__rgb_publisher.publish(self.__compose_image_message(data["color"]))
         self.__depth_publisher.publish(self.__compose_depth_message(data["depth"]))
+        self.__flir_publisher.publish(self.__compose_image_message(data["flir"]))
         # self.__fix_publisher.publish(data["fix"])
         # self.__intrinsics_publisher.publish(data["intrinsics"])
         return data["id"]

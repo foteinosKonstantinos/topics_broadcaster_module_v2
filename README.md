@@ -28,4 +28,5 @@ To change the compression ratio:
 ros2 param list
 ros2 param set /receiver_client rgb_compression_quality <quality in 0-100>
 ros2 param set /receiver_client depth_compression_quality <quality in 0-100>
+ros2 param set /receiver_client flir_compression_quality <quality in 0-100>
 ```

@@ -92,8 +92,9 @@ class Receiver(Node, Logger):
 
         self.__time_synchronizer = ApproximateTimeSynchronizer(
             fs=[
-                Subscriber(node=self, msg_type=Image, topic=self.__config["rgb_topic_ugv"]), 
-                Subscriber(node=self, msg_type=Image, topic=self.__config["depth_topic_ugv"]), 
+                Subscriber(node=self, msg_type=Image, topic=self.__config["rgb_topic_ugv"]),
+                Subscriber(node=self, msg_type=Image, topic=self.__config["depth_topic_ugv"]),
+                Subscriber(node=self, msg_type=Image, topic=self.__config["flir_topic_ugv"]),
                 # Subscriber(node=self, msg_type=CameraInfo, topic=self.__config["intrinsics_topic_ugv"]),
                 # Subscriber(node=self, msg_type=NavSatFix, topic=self.__config["fix_topic_ugv"], qos_profile=qos_profile_sensor_data),
                 Subscriber(node=self, msg_type=Float32, topic=self.__config["heading_topic_ugv"])
@@ -112,6 +113,7 @@ class Receiver(Node, Logger):
 
         self.declare_parameter("rgb_compression_quality", self.__config["rgb_quality"])
         self.declare_parameter("depth_compression_quality", self.__config["depth_quality"])
+        self.declare_parameter("flir_compression_quality", self.__config["flir_quality"])
 
     def __fps_filter(self):
         fps = self.__config["fps"]
@@ -135,16 +137,16 @@ class Receiver(Node, Logger):
     def __array_from_image(self, img:Image):
 
         # RealSense
-        # yuyv = np.frombuffer(img.data, dtype=np.uint8)
-        # yuyv = yuyv.reshape((img.height, img.width, 2))
+        yuyv = np.frombuffer(img.data, dtype=np.uint8)
+        yuyv = yuyv.reshape((img.height, img.width, 2))
         # # bgr = cv2.cvtColor(yuyv, cv2.COLOR_YUV2BGR_YUY2)
         # # color_array = bgr.reshape((color_image.height, color_image.width, 3)) # BGR
-        # rgb = cv2.cvtColor(yuyv, cv2.COLOR_YUV2RGB_YUY2)
-        # color_array = rgb.reshape((img.height, img.width, 3)) # RGB
+        rgb = cv2.cvtColor(yuyv, cv2.COLOR_YUV2RGB_YUY2)
+        color_array = rgb.reshape((img.height, img.width, 3)) # RGB
 
         # Dummy test
-        color_array = np.asarray(img.data, dtype=np.uint8).reshape((img.height, img.width, 3)) # H x W x 3
-        color_array = cv2.cvtColor(color_array, cv2.COLOR_BGR2RGB) # RGB
+        # color_array = np.asarray(img.data, dtype=np.uint8).reshape((img.height, img.width, 3)) # H x W x 3
+        # color_array = cv2.cvtColor(color_array, cv2.COLOR_BGR2RGB) # RGB
 
         return color_array
 
@@ -182,7 +184,19 @@ class Receiver(Node, Logger):
             "max_depth": max_depth,
         }
 
-    def __callback(self, color:Image, depth:Image, #intrinsics:CameraInfo, fix:NavSatFix, 
+    def __decompose_flir_message(self, flir:Image) -> dict:
+        array = np.frombuffer(flir.data, dtype=np.uint8).reshape((flir.height, flir.width, 3))
+        return {
+            "header": flir.header,
+            "height": flir.height,
+            "width": flir.width,
+            "encoding": flir.encoding, # RGB-8
+            "is_bigendian": flir.is_bigendian,
+            "step": flir.step,
+            "data": compress_image(array, self.get_parameter("flir_compression_quality").get_parameter_value().integer_value)
+        }
+
+    def __callback(self, color:Image, depth:Image, flir:Image, #intrinsics:CameraInfo, fix:NavSatFix, 
                    heading:Float32):
         if not self.__fps_filter():
             return
@@ -191,6 +205,7 @@ class Receiver(Node, Logger):
             "id": self.__msg_id,
             "color": self.__decompose_image_message(color),
             "depth": self.__decompose_depth_message(depth),
+            "flir": self.__decompose_flir_message(flir),
             "heading": heading,
             # "intrinsics": intrinsics,
             # "fix": fix,

@@ -36,7 +36,7 @@ CONFIGURATION = {
 
     "fps": 2,
 
-    "server_IP": "127.0.0.1",
+    "server_IP": "127.0.0.1", # TODO
     "server_port": 49152,
     "chunk_size": 4096,
     # "prelude": b"[===PRELUDE===]",
@@ -48,7 +48,7 @@ CONFIGURATION = {
     "error": b"ERROR",
     "invalid": b"INVALID",
     "delay": 0,
-    "slop": 1e-1,
+    "slop": 1,
 
     "heading_topic_ugv": "/b2/nicla/magnetometer/heading",
     "heading_topic_gs": "/b2/nicla/magnetometer/heading_broadcasted",
@@ -63,6 +63,10 @@ CONFIGURATION = {
     "depth_topic_ugv": "/b2/camera_front_435i/realsense_front_435i/aligned_depth_to_color/image_raw",
     "depth_topic_gs": "/b2/camera_front_435i/realsense_front_435i/aligned_depth_to_color/image_raw_broadcasted",
     "depth_quality": 100, # percentage
+
+    "flir_topic_ugv": "/b2/camera_flir/image_raw",
+    "flir_topic_gs": "/b2/camera_flir/image_raw_broadcasted",
+    "flir_quality": 80, # percentage
 
     # "intrinsics_topic_ugv": "/b2/camera_front_435i/realsense_front_435i/color/camera_info",
     # "intrinsics_topic_gs": "/b2/camera_front_435i/realsense_front_435i/color/camera_info_broadcasted",
