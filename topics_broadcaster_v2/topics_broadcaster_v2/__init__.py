@@ -49,6 +49,8 @@ CONFIGURATION = {
     "invalid": b"INVALID",
     "delay": 0,
     "slop": 1,
+    "timeout": 1.0, # sec
+    "max_iter": 100,
 
     "heading_topic_ugv": "/b2/nicla/magnetometer/heading",
     "heading_topic_gs": "/b2/nicla/magnetometer/heading_broadcasted",

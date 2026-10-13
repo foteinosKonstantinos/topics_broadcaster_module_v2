@@ -6,6 +6,7 @@ from std_msgs.msg import Float32
 from sensor_msgs.msg import Image as SensorImage, CameraInfo, NavSatFix
 from rclpy.executors import ExternalShutdownException
 from . import CONFIGURATION, blue_back
+import time
 
 class Producer(Node):
 
@@ -15,6 +16,12 @@ class Producer(Node):
         self.__color_publisher=self.create_publisher(
             msg_type = SensorImage,
             topic = CONFIGURATION["rgb_topic_ugv"],
+            qos_profile = 10
+        )
+
+        self.__flir_publisher=self.create_publisher(
+            msg_type = SensorImage,
+            topic = CONFIGURATION["flir_topic_ugv"],
             qos_profile = 10
         )
 
@@ -44,16 +51,27 @@ class Producer(Node):
 
         self.__timer = self.create_timer(0.1, self.publish) # 10 FPS
 
-        self.__color = "/home/konstantinosf/Projects/gesture_module_v2/gesture_module_LOCAL/frames/high_Come-to-me_338_color.png"
-        self.__depth = "/home/konstantinosf/Projects/gesture_module_v2/gesture_module_LOCAL/frames/high_Come-to-me_338_depth.png"
+        self.__color = "/home/konstantinosf/Projects/gesture_module_v2/gesture_module_v2/frames/high_Come-to-me_338_color.png"
+        self.__depth = "/home/konstantinosf/Projects/gesture_module_v2/gesture_module_v2/frames/high_Come-to-me_338_depth.png"
+        self.__flir = "/home/konstantinosf/Downloads/flir.jpg"
 
         self.get_logger().info(blue_back("DUMMY PRODUCER (LOCAL DEBUGGING)"))
 
+        self.previous = None
+
     def publish(self):
+
+        now = time.time()
+        if (self.previous is not None) and (now - self.previous < 0.1):
+            return
+        if self.previous is not None:
+            self.get_logger().info(f"FPS: {1/(now - self.previous)}")
+        self.previous = now
 
         stamp = self.get_clock().now().to_msg()
 
         color = np.asarray(PILImage.open(self.__color).convert("RGB"))
+        flir = np.asarray(PILImage.open(self.__flir).convert("RGB"))
         depth = np.asarray(PILImage.open(self.__depth),dtype=np.uint16)
 
         msg = SensorImage()
@@ -66,6 +84,17 @@ class Producer(Node):
         msg.step = 3 * color.shape[1]
         msg.data = color.tobytes()
         self.__color_publisher.publish(msg)
+
+        msg = SensorImage()
+        msg.header.stamp = stamp
+        msg.header.frame_id = ""
+        msg.height = flir.shape[0]
+        msg.width = flir.shape[1]
+        msg.encoding = "rgb8"
+        msg.is_bigendian = False
+        msg.step = 3 * flir.shape[1]
+        msg.data = flir.tobytes()
+        self.__flir_publisher.publish(msg)
 
         msg = SensorImage()
         msg.header.stamp = stamp
@@ -95,7 +124,7 @@ class Producer(Node):
         msg.data = 0.0 # degrees, magnetic north, clockwise (!)
         self.__heading_publisher.publish(msg)
 
-        self.get_logger().info("Published.")
+        #self.get_logger().info(f"Published. FPS: {1/(now-self.previous)}")
 
 def main():
     try:

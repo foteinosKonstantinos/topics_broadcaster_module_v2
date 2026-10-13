@@ -46,7 +46,10 @@ def send_TCP(msg_bytes:bytes,               #
 
         print()
 
-        while True: # avoid closing connection ("[Errno 104] Connection reset by peer")
+        # avoid closing connection ("[Errno 104] Connection reset by peer")
+        client.settimeout(config["timeout"])
+        c = 0
+        while c < config["max_iter"]:
             if response == config["valid"]:
                 logger.info(f"{prefix} {green_fore('Success')}")
                 break
@@ -57,11 +60,20 @@ def send_TCP(msg_bytes:bytes,               #
                 logger.warn(f"{prefix} Final response (valid or invalid) not received")
                 break
             response = client.recv(config["server_response_size"])
+            c += 1
+        if c == config["max_iter"]:
+            logger.warn(f"{prefix} Final response (valid or invalid) not received after {c} iterations")
+            print(end="\a")
 
         if total_send != len(msg_bytes):
             logger.error(f"{prefix} {red_fore('Data truncated by client')}")
 
         return response
+
+    except socket.timeout: # avoid inf blocing
+        logger.error(f"{prefix} {red_fore('Timeout expired')}")
+        print(end="\a")
+        return config["error"]
 
     except ConnectionRefusedError:
         logger.error(f"{prefix} {red_fore('Connection refused (server error)')}")
@@ -137,16 +149,14 @@ class Receiver(Node, Logger):
     def __array_from_image(self, img:Image):
 
         # RealSense
-        yuyv = np.frombuffer(img.data, dtype=np.uint8)
-        yuyv = yuyv.reshape((img.height, img.width, 2))
-        # # bgr = cv2.cvtColor(yuyv, cv2.COLOR_YUV2BGR_YUY2)
-        # # color_array = bgr.reshape((color_image.height, color_image.width, 3)) # BGR
-        rgb = cv2.cvtColor(yuyv, cv2.COLOR_YUV2RGB_YUY2)
-        color_array = rgb.reshape((img.height, img.width, 3)) # RGB
+        # yuyv = np.frombuffer(img.data, dtype=np.uint8)
+        # yuyv = yuyv.reshape((img.height, img.width, 2))
+        # rgb = cv2.cvtColor(yuyv, cv2.COLOR_YUV2RGB_YUY2)
+        # color_array = rgb.reshape((img.height, img.width, 3)) # RGB
 
         # Dummy test
-        # color_array = np.asarray(img.data, dtype=np.uint8).reshape((img.height, img.width, 3)) # H x W x 3
-        # color_array = cv2.cvtColor(color_array, cv2.COLOR_BGR2RGB) # RGB
+        color_array = np.asarray(img.data, dtype=np.uint8).reshape((img.height, img.width, 3)) # H x W x 3
+        color_array = cv2.cvtColor(color_array, cv2.COLOR_BGR2RGB) # RGB
 
         return color_array
 
